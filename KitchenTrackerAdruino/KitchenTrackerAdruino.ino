@@ -1,6 +1,4 @@
 #include "ble_config.h"
-#include <Arduino.h>
-
 /*
  * Provides skeleton code to interact with the Android FaceTrackerBLE app
  *
@@ -36,6 +34,11 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 
 #define MAX_SERVO_ANGLE  180
 #define MIN_SERVO_ANGLE  0
+
+int _stepAmount = 5; // the amount to change the angle of servo on each pass
+int _minAngle = 0;
+int _maxAngle = 180;
+volatile int _curAngle = 0;
 
 #define BLE_DEVICE_CONNECTED_DIGITAL_OUT_PIN D7
 
@@ -120,10 +123,12 @@ void setup() {
   send_characteristic.process = &bleSendDataTimerCallback;
   ble.setTimer(&send_characteristic, _sendDataFrequency);
   ble.addTimer(&send_characteristic);
+
 }
 
 void loop()
 {
+
   // Not currently used. The "meat" of the program is in the callback bleWriteCallback and send_notify
 }
 
@@ -167,7 +172,7 @@ void bleDisconnectedCallback(uint16_t handle) {
  * @retval
  */
 int bleReceiveDataCallback(uint16_t value_handle, uint8_t *buffer, uint16_t size) {
-
+ Serial.print("Getting something: ");
   if (receive_handle == value_handle) {
     memcpy(receive_data, buffer, RECEIVE_MAX_LEN);
     Serial.print("Received data: ");
@@ -186,6 +191,33 @@ int bleReceiveDataCallback(uint16_t value_handle, uint8_t *buffer, uint16_t size
       // and properly angles the servo + ultrasonic sensor towards the face
       // Example servo code here: https://github.com/jonfroehlich/CSE590Sp2018/tree/master/L06-Arduino/RedBearDuoServoSweep
     }
+
+    if (receive_data[0] == 0x04) { //receive the face data
+    Serial.println("update");
+     Serial.println(receive_data[3]);
+
+    int happiness = receive_data[3];
+    /*if(happiness == 0) {
+      //Serial.print('left');
+      if((_curAngle + _stepAmount) <=  MAX_SERVO_ANGLE) {
+      _curAngle = _curAngle + _stepAmount;
+      }
+    } else if (happiness == 1) {
+      if((_curAngle + _stepAmount) <= MIN_SERVO_ANGLE ) {
+      _curAngle = _curAngle - _stepAmount;
+      }
+     // Serial.print('right');
+    }*/
+    Serial.println(happiness);
+    //Serial.println(_curAngle);
+
+   _happinessServo.write( happiness);
+
+    //analogWrite(HAPPINESS_ANALOG_OUT_PIN, receive_data[1] );
+
+    }
+
+
   }
   return 0;
 }
