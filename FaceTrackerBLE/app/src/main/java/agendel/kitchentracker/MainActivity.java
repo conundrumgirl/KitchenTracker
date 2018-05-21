@@ -504,8 +504,8 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
             if (subject!= null  && subject.length > 0) {
                 age = (int)subject[0].faceAttributes.age;
             }
-            buf[2] = (byte)age;
-            buf[3] = (byte)coordsToDegreesMapping;
+            buf[1] = (byte)age;
+            buf[2] = (byte)coordsToDegreesMapping;
 
             // Send the data!
             if (System.currentTimeMillis() - timeStamp > debounce) {

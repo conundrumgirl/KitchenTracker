@@ -26,28 +26,21 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 #define BLE_SHORT_NAME 'A', 'L', 'I', 'N', 'A', '1'
 
 /* Define the pins on the Duo board
- * TODO: change and add/subtract the pins here for your applications (as necessary)
  */
-#define LED_ANALOG_OUT_PIN D8
+#define LED_ANALOG_OUT_PIN A0
 #define PIEZO_OUT_PIN A1
 #define SERVO_ANALOG_OUT_PIN D2
+const int TRIG_PIN = D0;
+const int ECHO_PIN = D1;
+#define BLE_DEVICE_CONNECTED_DIGITAL_OUT_PIN D7
+
 
 #define MAX_SERVO_ANGLE 180
 #define MIN_SERVO_ANGLE 0
 #define ALARM_THRESHOLD 50
 
-int _stepAmount = 5; // the amount to change the angle of servo on each pass
-int _minAngle = 0;
-int _maxAngle = 180;
 volatile int _servoAngle;
-
 volatile int age = 0;
-
-#define BLE_DEVICE_CONNECTED_DIGITAL_OUT_PIN D7
-
-// Pins
-const int TRIG_PIN = D0;
-const int ECHO_PIN = D1;
 
 // Anything over 400 cm (23200 us pulse) is "out of range"
 const unsigned int MAX_DIST = 23200;
@@ -97,9 +90,6 @@ volatile int _readings[SMOOTHING_WINDOW_SIZE]; // the readings from the analog i
 volatile int _readIndex = 0;                   // the index of the current reading
 volatile int _total = 0;                       // the running total
 volatile int _average = 0;
-
-volatile int _oldReading = 0; // the average - used to check if we are reading phone or potentiometer
-
 
 
 void setup()
@@ -151,7 +141,7 @@ void setup()
   pinMode(PIEZO_OUT_PIN, OUTPUT);
 
   _servoAngle = ((int)((MAX_SERVO_ANGLE - MIN_SERVO_ANGLE) / 2.0));
-  _servo.write(90);
+  _servo.write( _servoAngle);
   // Start a task to check status of the pins on your RedBear Duo
   // Works by polling every X milliseconds where X is _sendDataFrequency
   send_characteristic.process = &bleSendDataTimerCallback;
@@ -224,8 +214,8 @@ int bleReceiveDataCallback(uint16_t value_handle, uint8_t *buffer, uint16_t size
 
     if (receive_data[0] == 0x04)
     { //receive the face data
-      age = receive_data[2];
-      int new_angle = receive_data[3];
+      age = receive_data[1];
+      int new_angle = receive_data[2];
       if (new_angle > _servoAngle + 5 || new_angle < _servoAngle - 5)
       {
         //Serial.print("new angle: ");
@@ -241,8 +231,6 @@ int bleReceiveDataCallback(uint16_t value_handle, uint8_t *buffer, uint16_t size
 
 static void soundAlarm()
 {
-
-  Serial.println('alarm');
   digitalWrite(LED_ANALOG_OUT_PIN, LOW);
   tone(PIEZO_OUT_PIN, 261);
   delay(300);
@@ -285,6 +273,7 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts)
   // Reads the echoPin, returns the sound wave travel time in microseconds
   int duration = pulseIn(ECHO_PIN, HIGH);
   int distance = round(duration * 0.034 / 2);
+  distance = getSmoothedReading(distance);
   Serial.println(distance);
   if (distance > 400)
   { //out of range status
