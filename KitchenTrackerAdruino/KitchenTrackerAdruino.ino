@@ -19,9 +19,6 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 // Must be an integer between 1 and 9 and and must also be set to len(BLE_SHORT_NAME) + 1
 #define BLE_SHORT_NAME_LEN 7
 
-// The number of chars should be BLE_SHORT_NAME_LEN - 1. So, for example, if your BLE_SHORT_NAME was 'J', 'o', 'n'
-// then BLE_SHORT_NAME_LEN should be 4. If 'M','a','k','e','L','a','b' then BLE_SHORT_NAME_LEN should be 8
-// TODO: you must change this name. Otherwise, you will not be able to differentiate your RedBear Duo BLE
 // device from everyone else's device in class.
 #define BLE_SHORT_NAME 'A', 'L', 'I', 'N', 'A', '1'
 
@@ -33,7 +30,6 @@ SYSTEM_MODE(SEMI_AUTOMATIC);
 const int TRIG_PIN = D0;
 const int ECHO_PIN = D1;
 #define BLE_DEVICE_CONNECTED_DIGITAL_OUT_PIN D7
-
 
 #define MAX_SERVO_ANGLE 180
 #define MIN_SERVO_ANGLE 0
@@ -91,14 +87,13 @@ volatile int _readIndex = 0;                   // the index of the current readi
 volatile int _total = 0;                       // the running total
 volatile int _average = 0;
 
-
 void setup()
 {
   Serial.begin(115200);
 
   //sonic
   pinMode(TRIG_PIN, OUTPUT);
-  digitalWrite(TRIG_PIN, LOW);
+  pinMode(ECHO_PIN, INPUT);
   pinMode(LED_ANALOG_OUT_PIN, OUTPUT);
 
   //blincer
@@ -141,7 +136,7 @@ void setup()
   pinMode(PIEZO_OUT_PIN, OUTPUT);
 
   _servoAngle = ((int)((MAX_SERVO_ANGLE - MIN_SERVO_ANGLE) / 2.0));
-  _servo.write( _servoAngle);
+  _servo.write(_servoAngle);
   // Start a task to check status of the pins on your RedBear Duo
   // Works by polling every X milliseconds where X is _sendDataFrequency
   send_characteristic.process = &bleSendDataTimerCallback;
@@ -208,18 +203,16 @@ int bleReceiveDataCallback(uint16_t value_handle, uint8_t *buffer, uint16_t size
       // Serial.print(receive_data[index]);
       //Serial.print(" ");
     }
-    //Serial.println(" ");
-
-    // process the data.
 
     if (receive_data[0] == 0x04)
     { //receive the face data
+      // we are getting age from MS AI
       age = receive_data[1];
       int new_angle = receive_data[2];
-      if (new_angle > _servoAngle + 5 || new_angle < _servoAngle - 5)
+      if (new_angle > _servoAngle + 1 || new_angle < _servoAngle - 1)
       {
-        Serial.print("new_angle : ");
-        Serial.println(new_angle );
+        //Serial.print("new_angle : ");
+        //Serial.println(new_angle );
 
         _servo.write(new_angle);
         _servoAngle = new_angle;
@@ -233,16 +226,8 @@ static void soundAlarm()
 {
   digitalWrite(LED_ANALOG_OUT_PIN, LOW);
   tone(PIEZO_OUT_PIN, 261);
-  delay(300);
+  delay(200);
   digitalWrite(LED_ANALOG_OUT_PIN, HIGH);
-  tone(PIEZO_OUT_PIN, 277);
-  delay(300);
-  digitalWrite(LED_ANALOG_OUT_PIN, LOW);
-  tone(PIEZO_OUT_PIN, 311);
-  delay(300);
-  digitalWrite(LED_ANALOG_OUT_PIN, HIGH);
-  tone(PIEZO_OUT_PIN, 330);
-  delay(300);
   noTone(PIEZO_OUT_PIN);
 }
 
@@ -263,17 +248,16 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts)
   byte b2 = (0x00);
   byte b3 = age;
 
-  // Clears the trigPin
   digitalWrite(TRIG_PIN, LOW);
   delayMicroseconds(2);
-  // Sets the trigPin on HIGH state for 10 micro seconds
   digitalWrite(TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
-  // Reads the echoPin, returns the sound wave travel time in microseconds
   int duration = pulseIn(ECHO_PIN, HIGH);
+
   int distance = round(duration * 0.034 / 2);
   distance = getSmoothedReading(distance);
+
   Serial.println(distance);
   if (distance > 400)
   { //out of range status
@@ -281,10 +265,10 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts)
   }
   else
   {
-    if (distance < ALARM_THRESHOLD && distance > 0 /*&& age < 10*/)
-    {
-      soundAlarm();
-    }
+    if ((distance < ALARM_THRESHOLD) && (distance > 0))
+      {
+        soundAlarm();
+      }
 
     b1 = distance / 255;
     b2 = distance % 255;
@@ -297,7 +281,6 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts)
   send_data[4] = _servoAngle;
 
   ble.sendNotify(send_handle, send_data, SEND_MAX_LEN);
-
   ble.setTimer(ts, _sendDataFrequency);
   ble.addTimer(ts);
 }
@@ -305,6 +288,7 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts)
 /* From Jon's example but I also throw away the outliers */
 int getSmoothedReading(int curReading)
 {
+  //get rid of obvious outliers
   if (abs(curReading - _readings[_readIndex]) > 100 && _readings[_readIndex] > 0)
   {
     return _readings[_readIndex];

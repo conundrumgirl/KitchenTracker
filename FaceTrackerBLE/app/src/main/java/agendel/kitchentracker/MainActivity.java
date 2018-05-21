@@ -94,10 +94,6 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
     int _total = 0;                       // the running total
     int _average = 0;
 
-   int _oldReading = 0;
-
-
-
    private final String TARGET_BLE_DEVICE_NAME = "ALINA1";
 
     private FaceServiceClient faceServiceClient = new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "e878dc1c07c64cfa83ec7deedb0d5202");
@@ -492,10 +488,8 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
 
             byte[] buf = new byte[] { (byte) 0x04, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00}; // 5-byte initialization
 
-            // CSE590 Student TODO:
-            // Write code that puts in your data into the buffer
-
             float x_center =  (getSmoothedReading(Math.round(face.getPosition().x)) + face.getWidth() / 2);
+            //narrowing the angle. We don't need entire 180degrees
             float coordsToDegreesMapping = (x_center  / CAMERA_PREVIEW_HEIGHT) * 70 + 55;
             int age = 0;
             coordsToDegreesMapping = 180 - coordsToDegreesMapping;
@@ -671,7 +665,7 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
             distance = 255 * coeff + remainder;
         }
 
-        String subjectDesc = "unknown";
+        String subjectDesc = "acquiring...";
 
         Log.i(TAG, data[0] + " , "+data[1] + " , "+ data[2] );
         if(age > 0) {
@@ -692,7 +686,7 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
         if (distance == -1) {
             strDistance = "Out of Range";
         }
-        strDistance = strDistance + " (servo angle: " + servo + ")";
+        strDistance = strDistance +  System.getProperty ("line.separator")+ " (servo angle: " + servo + ")";
         subjectInfo.setText("Distance to subject: " + strDistance + System.getProperty ("line.separator")+ " Subject:" + subjectDesc);
     }
 
@@ -702,13 +696,6 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
     }
 
 
-    public float  map_range(float value, float low1, float high1, float low2, float high2) {
-        return low2 + (high2 - low2) * (value - low1) / (high1 - low1);
-    }
-
-    public int map_range(int value, int low1, int high1, int low2, int high2) {
-        return (int)low2 + (high2 - low2) * (value - low1) / (high1 - low1);
-    }
 
     int getSmoothedReading(int curReading)
     {
@@ -716,7 +703,6 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
         _readings[_readIndex] = curReading;
         _total = _total + _readings[_readIndex];
         _readIndex = _readIndex + 1;
-        // if we're at the end of the array...
         if (_readIndex >= SMOOTHING_WINDOW_SIZE)
         {
             _readIndex = 0;
