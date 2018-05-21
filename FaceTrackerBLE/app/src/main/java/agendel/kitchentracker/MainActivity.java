@@ -9,7 +9,10 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.Color;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.support.constraint.ConstraintLayout;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
@@ -28,8 +31,12 @@ import com.google.android.gms.vision.Tracker;
 import com.google.android.gms.vision.face.Face;
 import com.google.android.gms.vision.face.FaceDetector;
 import com.google.android.gms.vision.face.LargestFaceFocusingProcessor;
+import com.microsoft.projectoxford.face.FaceServiceClient;
+import com.microsoft.projectoxford.face.FaceServiceRestClient;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 import agendel.kitchentracker.ble.BLEDevice;
 import agendel.kitchentracker.ble.BLEListener;
@@ -52,12 +59,13 @@ import agendel.kitchentracker.camera.GraphicOverlay;
  * Jon TODO:
  *  1. (Low priority) We shouldn't disconnect from BLE just because our orientation changed (e.g., from Portrait to Landscape). How to deal?
  */
-public class MainActivity extends AppCompatActivity implements BLEListener{
+public class MainActivity extends AppCompatActivity implements BLEListener {
 
     private static final String TAG = "FaceTrackerBLE";
     private static final int RC_HANDLE_GMS = 9001;
     private static final int CAMERA_PREVIEW_WIDTH = 640;
     private static final int CAMERA_PREVIEW_HEIGHT = 480;
+    private static final int ALARM_THRESHOLD = 50;
 
     // permission request codes need to be < 256
     private static final int RC_HANDLE_CAMERA_PERM = 2;
@@ -66,6 +74,9 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
 
     private CameraSourcePreview mPreview;
     private GraphicOverlay mGraphicOverlay;
+    private ConstraintLayout infoPane;
+    private TextView subjectInfo, minorAlert;
+    public com.microsoft.projectoxford.face.contract.Face[] subject;
 
     private boolean mIsFrontFacing = true;
 
@@ -75,9 +86,9 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
     // Bluetooth stuff
     private BLEDevice mBLEDevice;
 
+
     //smoothing
-    //smoothing
-   private final int SMOOTHING_WINDOW_SIZE = 5;
+   private final int SMOOTHING_WINDOW_SIZE = 10;
     int[] _readings= new int [SMOOTHING_WINDOW_SIZE]; // the readings from the analog input
     int _readIndex = 0;                   // the index of the current reading
     int _total = 0;                       // the running total
@@ -88,6 +99,8 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
 
 
    private final String TARGET_BLE_DEVICE_NAME = "ALINA1";
+
+    private FaceServiceClient faceServiceClient = new FaceServiceRestClient("https://westcentralus.api.cognitive.microsoft.com/face/v1.0", "e878dc1c07c64cfa83ec7deedb0d5202");
 
     //==============================================================================================
     // Activity Methods
@@ -108,6 +121,9 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
 
         mPreview = (CameraSourcePreview) findViewById(R.id.cameraSourcePreview);
         mGraphicOverlay = (GraphicOverlay) findViewById(R.id.faceOverlay);
+        subjectInfo = findViewById(R.id.debugInfo);
+        infoPane = findViewById(R.id.infoPane);
+        minorAlert = findViewById(R.id.minorAlert);
 
         final Button button = (Button) findViewById(R.id.buttonFlip);
         button.setOnClickListener(mFlipButtonListener);
@@ -425,9 +441,10 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
      * Face tracker for each detected individual. This maintains a face graphic within the app's
      * associated face overlay.
      */
-    private class FaceTracker extends Tracker<Face> {
+    class FaceTracker extends Tracker<Face> implements CameraSource.PictureCallback {
         private GraphicOverlay mOverlay;
         private FaceGraphic mFaceGraphic;
+        private boolean isProcessing;
 
         FaceTracker(GraphicOverlay overlay) {
             mOverlay = overlay;
@@ -440,7 +457,16 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
         @Override
         public void onNewItem(int faceId, Face item) {
             mFaceGraphic.setId(faceId);
+            if (mCameraSource != null && !isProcessing)
+                mCameraSource.takePicture(null, this);
         }
+
+        @Override
+        public void onPictureTaken(byte[] data) {
+         this.getAgeDataFromMS(data);
+        return;
+        }
+
 
         /**
          * Update the position/characteristics of the face within the overlay.
@@ -462,16 +488,23 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
 
             Log.i(TAG, debugFaceInfo);
 
+
+
             byte[] buf = new byte[] { (byte) 0x04, (byte) 0x00, (byte) 0x00, (byte) 0x00, (byte) 0x00}; // 5-byte initialization
 
             // CSE590 Student TODO:
             // Write code that puts in your data into the buffer
 
             float x_center =  (getSmoothedReading(Math.round(face.getPosition().x)) + face.getWidth() / 2);
-            float coordsToDegreesMapping = (x_center  / CAMERA_PREVIEW_WIDTH) * 180;
+            float coordsToDegreesMapping = (x_center  / CAMERA_PREVIEW_HEIGHT) * 180;
+            int age = 0;
             coordsToDegreesMapping = 180 - coordsToDegreesMapping;
 
             Log.i(TAG, "SEND"+ coordsToDegreesMapping);
+            if (subject!= null  && subject.length > 0) {
+                age = (int)subject[0].faceAttributes.age;
+            }
+            buf[2] = (byte)age;
             buf[3] = (byte)coordsToDegreesMapping;
 
             // Send the data!
@@ -501,7 +534,71 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
         public void onDone() {
             mOverlay.remove(mFaceGraphic);
         }
+
+
+
+        // Detect age etc. using azure service
+
+        private void getAgeDataFromMS(byte[] myBytes)
+        {
+            InputStream inputStream = new ByteArrayInputStream(myBytes);
+            AsyncTask<InputStream, String, com.microsoft.projectoxford.face.contract.Face[]> detectTask =
+                    new AsyncTask<InputStream, String, com.microsoft.projectoxford.face.contract.Face[]>() {
+                        @Override
+                        protected com.microsoft.projectoxford.face.contract.Face[] doInBackground(InputStream... params) {
+                            FaceServiceClient.FaceAttributeType[] requiredFaceAttributes = new FaceServiceClient.FaceAttributeType[] {
+                                    FaceServiceClient.FaceAttributeType.Age,
+                                    FaceServiceClient.FaceAttributeType.Gender,
+                                    FaceServiceClient.FaceAttributeType.Smile,
+                                    FaceServiceClient.FaceAttributeType.FacialHair,
+                                    FaceServiceClient.FaceAttributeType.HeadPose,
+                                    FaceServiceClient.FaceAttributeType.Glasses
+                            };
+                            try {
+                                publishProgress("Detecting...");
+                                com.microsoft.projectoxford.face.contract.Face[] result = faceServiceClient.detect(
+                                        params[0],
+                                        true,         // returnFaceId
+                                        false,        // returnFaceLandmarks
+                                        requiredFaceAttributes
+                                );
+                                if (result == null)
+                                {
+                                    publishProgress("Detection Finished. Nothing detected");
+                                    return null;
+                                }
+                                publishProgress(
+                                        String.format("Detection Finished. %d face(s) detected",
+                                                result.length));
+
+
+                                subject = result;
+                                return result;
+                            } catch (Exception e) {
+                                publishProgress("Detection failed");
+                                return null;
+                            }
+                        }
+                        @Override
+                        protected void onPreExecute() {
+                            //TODO: show progress dialog
+                        }
+                        @Override
+                        protected void onProgressUpdate(String... progress) {
+                            //TODO: update progress
+                        }
+                        /*@Override
+                        protected void onPostExecute(Face[] result) {
+                            //TODO: update face frames
+                        }*/
+                    };
+            detectTask.execute(inputStream);
+        }
+
+
     }
+
+
 
     //==============================================================================================
     // Bluetooth stuff
@@ -563,10 +660,40 @@ public class MainActivity extends AppCompatActivity implements BLEListener{
 
     @Override
     public void onBleDataReceived(byte[] data) {
-        // CSE590 Student TODO
-        // Write code here that receives the ultrasonic measurements from Arduino
-        // and outputs them in your app. (You could also consider receiving the angle
-        // of the servo motor but this would be more for debugging and is not necessary)
+
+        int status = (data[0]);
+        int age = data[3];
+        int distance = -1;
+        int servo =  data[4] & 0xFF;
+        if(status == 0 ) {
+            int coeff = (data[1] & 0xFF);
+            int remainder = (data[2] & 0xFF);
+            distance = 255 * coeff + remainder;
+        }
+
+        String subjectDesc = "unknown";
+
+        Log.i(TAG, data[0] + " , "+data[1] + " , "+ data[2] );
+        if(age > 0) {
+            subjectDesc = " age: " + age;
+            if (age < 20) {
+                this.minorAlert.setText("MINOR ALERT");
+            } else {
+                this.minorAlert.setText("");
+            }
+        }
+        if (distance < ALARM_THRESHOLD && distance > -1) {
+            infoPane.setBackgroundColor(Color.RED);
+        } else {
+            infoPane.setBackgroundColor(Color.GREEN);
+
+        }
+        String strDistance = String.valueOf(distance) + "cm. ";
+        if (distance == -1) {
+            strDistance = "Out of Range";
+        }
+        strDistance = strDistance + " (servo angle: " + servo + ")";
+        subjectInfo.setText("Distance to subject: " + strDistance + System.getProperty ("line.separator")+ " Subject:" + subjectDesc);
     }
 
     @Override

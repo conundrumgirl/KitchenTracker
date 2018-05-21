@@ -21,24 +21,66 @@
 
     </agendel.kitchentracker.camera.CameraSourcePreview>
 
-    <Button
-        android:id="@+id/buttonFlip"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
+    <android.support.constraint.ConstraintLayout
+        android:id="@+id/infoPane"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentLeft="true"
-        android:text="flip"/>
+        android:layout_alignParentStart="true"
+        android:background="@android:color/holo_green_dark">
 
-    <TextView
-        android:id="@+id/textViewBleStatus"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentTop="true"
-        android:layout_alignParentLeft="true"
-        android:layout_margin="4dp"
-        android:textSize="11dp"
-        android:textColor="#FFFFFF"
-        android:text="flip"/>
+        <Button
+            android:id="@+id/buttonFlip"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentTop="true"
+            android:text="flip"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
+            android:id="@+id/textViewBleStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentTop="true"
+            android:layout_margin="4dp"
+            android:text="flip"
+            android:textColor="#FFFFFF"
+            android:textSize="11dp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/debugInfo" />/>
+
+        <TextView
+            android:id="@+id/debugInfo"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentTop="true"
+            android:layout_margin="4dp"
+            android:layout_marginStart="8dp"
+            android:layout_marginTop="8dp"
+            android:text="HELLO"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/buttonFlip" />
+
+        <TextView
+            android:id="@+id/minorAlert"
+            android:layout_width="wrap_content"
+            android:layout_height="0dp"
+            android:layout_alignParentLeft="true"
+            android:layout_marginTop="8dp"
+            android:text=""
+            android:textColor="@android:color/holo_orange_light"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@+id/textViewBleStatus" />
+    </android.support.constraint.ConstraintLayout>
+
 
 
 </RelativeLayout>

@@ -18,6 +18,11 @@ buildscript {
 allprojects {
     repositories {
         google()
+        mavenLocal()
+        maven {
+            url "http://maven.affectiva.com"
+        }
+
         jcenter()
     }
 }
@@ -25,3 +30,4 @@ allprojects {
 task clean(type: Delete) {
     delete rootProject.buildDir
 }
+
