@@ -218,8 +218,8 @@ int bleReceiveDataCallback(uint16_t value_handle, uint8_t *buffer, uint16_t size
       int new_angle = receive_data[2];
       if (new_angle > _servoAngle + 5 || new_angle < _servoAngle - 5)
       {
-        //Serial.print("new angle: ");
-        Serial.println(age);
+        Serial.print("new_angle : ");
+        Serial.println(new_angle );
 
         _servo.write(new_angle);
         _servoAngle = new_angle;

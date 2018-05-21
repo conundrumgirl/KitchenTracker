@@ -496,7 +496,7 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
             // Write code that puts in your data into the buffer
 
             float x_center =  (getSmoothedReading(Math.round(face.getPosition().x)) + face.getWidth() / 2);
-            float coordsToDegreesMapping = (x_center  / CAMERA_PREVIEW_HEIGHT) * 180;
+            float coordsToDegreesMapping = (x_center  / CAMERA_PREVIEW_HEIGHT) * 70 + 55;
             int age = 0;
             coordsToDegreesMapping = 180 - coordsToDegreesMapping;
 
