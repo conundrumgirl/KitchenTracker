@@ -469,8 +469,8 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
          */
         @Override
         public void onUpdate(FaceDetector.Detections<Face> detectionResults, Face face) {
-            mOverlay.add(mFaceGraphic);
-            mFaceGraphic.updateFace(face);
+           // mOverlay.add(mFaceGraphic);
+           // mFaceGraphic.updateFace(face);
 
             boolean isPortrait = (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE);
             String debugFaceInfo = String.format("Portrait: %b Front-Facing Camera: %b FaceId: %d Loc (x,y): (%.1f, %.1f) Size (w, h): (%.1f, %.1f) Left Eye: %.1f Right Eye: %.1f  Smile: %.1f",
@@ -603,11 +603,11 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
                 BLEUtil.isBluetoothEnabled(this) &&
                 mBLEDevice.getState() == BLEDevice.State.DISCONNECTED){
             String msg = "Attempting to connect to '" + TARGET_BLE_DEVICE_NAME + "'";
-            Toast toast = Toast.makeText(
+            /*Toast toast = Toast.makeText(
                     MainActivity.this,
                     msg,
                     Toast.LENGTH_LONG);
-            toast.show();
+            toast.show();*/
             TextView textViewBleStatus = (TextView)findViewById(R.id.textViewBleStatus);
             textViewBleStatus.setText(msg);
             mBLEDevice.connect();
@@ -624,13 +624,13 @@ public class MainActivity extends AppCompatActivity implements BLEListener {
 
     @Override
     public void onBleConnectFailed() {
-        Toast toast = Toast
+        /*Toast toast = Toast
                 .makeText(
                         MainActivity.this,
                         "Couldn't find the BLE device with name '" + TARGET_BLE_DEVICE_NAME + "'!",
                         Toast.LENGTH_SHORT);
         toast.setGravity(0, 0, Gravity.CENTER);
-        toast.show();
+        toast.show();*/
 
         TextView textViewBleStatus = (TextView)findViewById(R.id.textViewBleStatus);
         textViewBleStatus.setText("BLE connection to '" + TARGET_BLE_DEVICE_NAME + "' failed");

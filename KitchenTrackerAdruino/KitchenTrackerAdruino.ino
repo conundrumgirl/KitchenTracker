@@ -81,7 +81,7 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts); // function de
 int _sendDataFrequency = 200;
 
 //smoothing
-const int SMOOTHING_WINDOW_SIZE = 3;
+const int SMOOTHING_WINDOW_SIZE = 5;
 volatile int _readings[SMOOTHING_WINDOW_SIZE]; // the readings from the analog input
 volatile int _readIndex = 0;                   // the index of the current reading
 volatile int _total = 0;                       // the running total
@@ -93,7 +93,7 @@ void setup()
 
   //sonic
   pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
+  digitalWrite(TRIG_PIN, LOW);
   pinMode(LED_ANALOG_OUT_PIN, OUTPUT);
 
   //blincer
@@ -248,16 +248,38 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts)
   byte b2 = (0x00);
   byte b3 = age;
 
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
+  unsigned long t1;
+  unsigned long t2;
+  unsigned long pulse_width;
+  float cm;
+  float inches;
+
+  // Hold the trigger pin high for at least 10 us
   digitalWrite(TRIG_PIN, HIGH);
   delayMicroseconds(10);
   digitalWrite(TRIG_PIN, LOW);
-  int duration = pulseIn(ECHO_PIN, HIGH);
 
-  int distance = round(duration * 0.034 / 2);
+  // Wait for pulse on echo pin
+  while ( digitalRead(ECHO_PIN) == 0 );
+
+  // Measure how long the echo pin was held high (pulse width)
+  // Note: the micros() counter will overflow after ~70 min
+  // TODO: We probably need to check for a timeout here just in case
+  // the ECHO_PIN never goes HIGH... so like
+  // while ( digitalRead(ECHO_PIN) == 1 && micros() - t1 < threshold);
+  t1 = micros();
+  while ( digitalRead(ECHO_PIN) == 1);
+  t2 = micros();
+  pulse_width = t2 - t1;
+
+  // Calculate distance in centimeters and inches. The constants
+  // are found in the datasheet, and calculated from the assumed speed
+  // of sound in air at sea level (~340 m/s).
+  // Datasheet: https://cdn.sparkfun.com/datasheets/Sensors/Proximity/HCSR04.pdf
+  cm = pulse_width / 58.0;
+
+  int distance = round(cm);
   distance = getSmoothedReading(distance);
-
   Serial.println(distance);
   if (distance > 400)
   { //out of range status
@@ -265,7 +287,7 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts)
   }
   else
   {
-    if ((distance < ALARM_THRESHOLD) && (distance > 0))
+    if ((distance < ALARM_THRESHOLD) && (distance > 0) && (age> 0) && (age < 10))
       {
         soundAlarm();
       }
@@ -289,10 +311,10 @@ static void bleSendDataTimerCallback(btstack_timer_source_t *ts)
 int getSmoothedReading(int curReading)
 {
   //get rid of obvious outliers
-  if (abs(curReading - _readings[_readIndex]) > 100 && _readings[_readIndex] > 0)
+  /*if (abs(curReading - _readings[_readIndex]) > 100 && _readings[_readIndex] > 0)
   {
     return _readings[_readIndex];
-  }
+  }*/
   _total = _total - _readings[_readIndex];
   _readings[_readIndex] = curReading;
   _total = _total + _readings[_readIndex];
